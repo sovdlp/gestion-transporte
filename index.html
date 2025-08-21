@@ -172,7 +172,7 @@
                 <h2 x-text="currentViewName" class="text-2xl font-bold"></h2>
                 <div class="flex items-center space-x-4">
                     <div class="relative">
-                        <button @click="exportToExcel()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                        <button @click="exportModalOpen = true" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
                             Exportar a Excel
                         </button>
                     </div>
@@ -302,7 +302,7 @@
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridad</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Entrega</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                                 </tr>
@@ -320,8 +320,8 @@
                                                   class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"></span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <span x-text="delivery.priority || 'Normal'" 
-                                                  :class="getPriorityClass(delivery.priority)"
+                                            <span x-text="delivery.deliveryType || 'Local'" 
+                                                  :class="getDeliveryTypeClass(delivery.deliveryType)"
                                                   class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"></span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
@@ -397,7 +397,7 @@
                                                   class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"></span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <button @click="completeAssignment(assignment)" class="text-green-600 hover:text-green-900 mr-3">
+                                            <button @click="showCompleteAssignmentModal(assignment)" class="text-green-600 hover:text-green-900 mr-3">
                                                 Completar
                                             </button>
                                             <button @click="showAssignmentModal(getDeliveryById(assignment.deliveryId), assignment)" class="text-blue-600 hover:text-blue-900 mr-3">
@@ -612,11 +612,10 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Prioridad</label>
-                        <select x-model="currentDelivery.priority" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                            <option value="normal">Normal</option>
-                            <option value="high">Alta</option>
-                            <option value="urgent">Urgente</option>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Tipo de Entrega</label>
+                        <select x-model="currentDelivery.deliveryType" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                            <option value="local">Local</option>
+                            <option value="nacional">Nacional</option>
                         </select>
                     </div>
                 </div>
@@ -723,6 +722,48 @@
         </div>
     </div>
 
+    <!-- Export Modal -->
+    <div x-show="exportModalOpen" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4">Exportar Documentos</h2>
+            <form @submit.prevent="exportFilteredData()">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Filtrar por Estado</label>
+                    <select x-model="exportFilters.status" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="">Todos los estados</option>
+                        <option value="pending">Pendiente</option>
+                        <option value="in_progress">En curso</option>
+                        <option value="completed">Completado</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Fecha Desde</label>
+                    <input x-model="exportFilters.dateFrom" type="date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Fecha Hasta</label>
+                    <input x-model="exportFilters.dateTo" type="date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Filtrar por Tipo de Entrega</label>
+                    <select x-model="exportFilters.deliveryType" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="">Todos los tipos</option>
+                        <option value="local">Local</option>
+                        <option value="nacional">Nacional</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button @click="exportModalOpen = false" type="button" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                        <i class="fas fa-download mr-1"></i>Exportar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- User Approval Modal -->
     <div x-show="userApprovalModalOpen" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
         <div class="bg-white rounded-lg p-6 w-full max-w-md">
@@ -754,6 +795,34 @@
                 </button>
                 <button @click="confirmUserApproval()" :disabled="!selectedUserRole" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
                     <i class="fas fa-check mr-1"></i>Aprobar Usuario
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Complete Assignment Modal -->
+    <div x-show="completeAssignmentModalOpen" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4">Completar Asignación</h2>
+            <div class="mb-4">
+                <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                    <h3 class="font-semibold text-gray-800 mb-2">Información de la Asignación</h3>
+                    <p class="text-sm text-gray-600"><strong>Documento:</strong> <span x-text="currentAssignmentToComplete?.documentNumber"></span></p>
+                    <p class="text-sm text-gray-600"><strong>Transportador:</strong> <span x-text="currentAssignmentToComplete?.driverName"></span></p>
+                    <p class="text-sm text-gray-600"><strong>Vehículo:</strong> <span x-text="currentAssignmentToComplete?.driverVehicle"></span></p>
+                </div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Fecha de Completado</label>
+                <input x-model="completionDate" type="date" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <p class="text-xs text-gray-500 mt-1">
+                    Seleccione la fecha en que se completó la entrega
+                </p>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button @click="completeAssignmentModalOpen = false" type="button" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                    Cancelar
+                </button>
+                <button @click="confirmCompleteAssignment()" :disabled="!completionDate" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    <i class="fas fa-check mr-1"></i>Completar Entrega
                 </button>
             </div>
         </div>
@@ -825,7 +894,7 @@
                     address: '', 
                     description: '', 
                     status: 'pending', 
-                    priority: 'normal',
+                    deliveryType: 'local',
                     createdAt: new Date().toISOString()
                 },
                 
@@ -842,6 +911,20 @@
                 userApprovalModalOpen: false,
                 currentUserForApproval: null,
                 selectedUserRole: '',
+                
+                // Export Modal
+                exportModalOpen: false,
+                exportFilters: {
+                    status: '',
+                    dateFrom: '',
+                    dateTo: '',
+                    deliveryType: ''
+                },
+                
+                // Complete Assignment Modal
+                completeAssignmentModalOpen: false,
+                currentAssignmentToComplete: null,
+                completionDate: '',
                 
                 // computed
                 get currentViewName() {
@@ -963,9 +1046,9 @@
                         ];
                         
                         this.deliveries = savedDeliveries ? this.validateAndParseData(savedDeliveries, 'deliveries') : [
-                            { id: '1', documentType: 'FACTURA DE VENTA', documentNumber: 'FV-2024-001', client: 'Tienda Don Pancho', address: 'Calle 123 #45-67', description: 'Pedido de alimentos', status: 'pending', priority: 'normal', createdAt: new Date().toISOString() },
-                            { id: '2', documentType: 'REMISION', documentNumber: 'RM-2024-002', client: 'Supermercado La Abundancia', address: 'Avenida Principal #100-23', description: 'Productos de limpieza', status: 'in_progress', priority: 'high', createdAt: new Date().toISOString() },
-                            { id: '3', documentType: 'GUIA DE DESPACHO', documentNumber: 'GD-2024-003', client: 'Restaurante El Fogón', address: 'Carrera 8 #12-34', description: 'Insumos para cocina', status: 'completed', priority: 'normal', createdAt: new Date().toISOString() }
+                            { id: '1', documentType: 'FACTURA DE VENTA', documentNumber: 'FV-2024-001', client: 'Tienda Don Pancho', address: 'Calle 123 #45-67', description: 'Pedido de alimentos', status: 'pending', deliveryType: 'local', createdAt: new Date().toISOString() },
+                            { id: '2', documentType: 'REMISION', documentNumber: 'RM-2024-002', client: 'Supermercado La Abundancia', address: 'Avenida Principal #100-23', description: 'Productos de limpieza', status: 'in_progress', deliveryType: 'nacional', createdAt: new Date().toISOString() },
+                            { id: '3', documentType: 'GUIA DE DESPACHO', documentNumber: 'GD-2024-003', client: 'Restaurante El Fogón', address: 'Carrera 8 #12-34', description: 'Insumos para cocina', status: 'completed', deliveryType: 'local', createdAt: new Date().toISOString() }
                         ];
                         
                         this.assignments = savedAssignments ? this.validateAndParseData(savedAssignments, 'assignments') : [
@@ -1009,9 +1092,9 @@
                     ];
                     
                     this.deliveries = [
-                        { id: '1', documentType: 'FACTURA DE VENTA', documentNumber: 'FV-2024-001', client: 'Tienda Don Pancho', address: 'Calle 123 #45-67', description: 'Pedido de alimentos', status: 'pending', priority: 'normal', createdAt: new Date().toISOString() },
-                        { id: '2', documentType: 'REMISION', documentNumber: 'RM-2024-002', client: 'Supermercado La Abundancia', address: 'Avenida Principal #100-23', description: 'Productos de limpieza', status: 'in_progress', priority: 'high', createdAt: new Date().toISOString() },
-                        { id: '3', documentType: 'GUIA DE DESPACHO', documentNumber: 'GD-2024-003', client: 'Restaurante El Fogón', address: 'Carrera 8 #12-34', description: 'Insumos para cocina', status: 'completed', priority: 'normal', createdAt: new Date().toISOString() }
+                        { id: '1', documentType: 'FACTURA DE VENTA', documentNumber: 'FV-2024-001', client: 'Tienda Don Pancho', address: 'Calle 123 #45-67', description: 'Pedido de alimentos', status: 'pending', deliveryType: 'local', createdAt: new Date().toISOString() },
+                        { id: '2', documentType: 'REMISION', documentNumber: 'RM-2024-002', client: 'Supermercado La Abundancia', address: 'Avenida Principal #100-23', description: 'Productos de limpieza', status: 'in_progress', deliveryType: 'nacional', createdAt: new Date().toISOString() },
+                        { id: '3', documentType: 'GUIA DE DESPACHO', documentNumber: 'GD-2024-003', client: 'Restaurante El Fogón', address: 'Carrera 8 #12-34', description: 'Insumos para cocina', status: 'completed', deliveryType: 'local', createdAt: new Date().toISOString() }
                     ];
                     
                     this.assignments = [
@@ -1359,7 +1442,7 @@
                 },
                 
                 deleteDelivery(delivery) {
-                    if (confirm(`¿Estás seguro de eliminar la entrega para ${delivery.client}?`)) {
+                    if (confirm(`¿Estás seguro de eliminar el documento ${delivery.documentNumber}?`)) {
                         this.deliveries = this.deliveries.filter(d => d.id !== delivery.id);
                         this.saveData();
                         this.filterDeliveries();
@@ -1510,6 +1593,14 @@
                         'NOTA DE ENTREGA': 'bg-indigo-100 text-indigo-800'
                     };
                     return classMap[documentType] || 'bg-gray-100 text-gray-800';
+                },
+                
+                getDeliveryTypeClass(deliveryType) {
+                    const classMap = {
+                        'local': 'bg-green-100 text-green-800',
+                        'nacional': 'bg-blue-100 text-blue-800'
+                    };
+                    return classMap[deliveryType] || 'bg-green-100 text-green-800';
                 },
                 
                 getPriorityClass(priority) {
@@ -1703,12 +1794,12 @@
                 downloadTemplate() {
                     // Create template data
                     const templateData = [
-                        ['Tipo de Documento', 'Número de Documento', 'Descripción', 'Estado', 'Prioridad'],
-                        ['FACTURA DE VENTA', 'FV-2024-001', 'Ejemplo de factura de venta', 'Pendiente', 'Normal'],
-                        ['REMISION', 'RM-2024-002', 'Ejemplo de remisión', 'Pendiente', 'Alta'],
-                        ['ORDEN DE COMPRA', 'OC-2024-003', 'Ejemplo de orden de compra', 'Pendiente', 'Urgente'],
-                        ['GUIA DE DESPACHO', 'GD-2024-004', 'Ejemplo de guía de despacho', 'En curso', 'Normal'],
-                        ['NOTA DE ENTREGA', 'NE-2024-005', 'Ejemplo de nota de entrega', 'Completado', 'Normal']
+                        ['Tipo de Documento', 'Número de Documento', 'Descripción', 'Estado', 'Tipo de Entrega'],
+                        ['FACTURA DE VENTA', 'FV-2024-001', 'Ejemplo de factura de venta', 'Pendiente', 'Local'],
+                        ['REMISION', 'RM-2024-002', 'Ejemplo de remisión', 'Pendiente', 'Nacional'],
+                        ['ORDEN DE COMPRA', 'OC-2024-003', 'Ejemplo de orden de compra', 'Pendiente', 'Local'],
+                        ['GUIA DE DESPACHO', 'GD-2024-004', 'Ejemplo de guía de despacho', 'En curso', 'Nacional'],
+                        ['NOTA DE ENTREGA', 'NE-2024-005', 'Ejemplo de nota de entrega', 'Completado', 'Local']
                     ];
                     
                     // Create worksheet
@@ -1720,7 +1811,7 @@
                         { wch: 20 }, // Número de Documento
                         { wch: 30 }, // Descripción
                         { wch: 15 }, // Estado
-                        { wch: 15 }  // Prioridad
+                        { wch: 15 }  // Tipo de Entrega
                     ];
                     
                     // Create workbook
@@ -1733,11 +1824,11 @@
                     this.showNotification('Plantilla descargada exitosamente', 'success', 'fas fa-download');
                 },
                 
-                // Excel Export
+                // Excel Export Functions
                 exportToExcel() {
-                    // Prepare data for export
+                    // Prepare data for export (all deliveries)
                     const data = [
-                        ['Tipo de Documento', 'Número de Documento', 'Descripción', 'Estado', 'Prioridad', 'Transportador', 'Fecha Asignación']
+                        ['Tipo de Documento', 'Número de Documento', 'Descripción', 'Estado', 'Tipo de Entrega', 'Transportador', 'Fecha Asignación', 'Fecha Creación']
                     ];
                     
                     this.deliveries.forEach(delivery => {
@@ -1749,9 +1840,10 @@
                             delivery.documentNumber,
                             delivery.description || '',
                             this.getStatusText(delivery.status),
-                            delivery.priority === 'normal' ? 'Normal' : delivery.priority === 'high' ? 'Alta' : 'Urgente',
+                            delivery.deliveryType === 'nacional' ? 'Nacional' : 'Local',
                             driver ? driver.name : 'No asignado',
-                            assignment ? new Date(assignment.assignmentTime).toLocaleString() : ''
+                            assignment ? new Date(assignment.assignmentTime).toLocaleString() : '',
+                            new Date(delivery.createdAt).toLocaleString()
                         ]);
                     });
                     
@@ -1764,9 +1856,10 @@
                         { wch: 20 }, // Número de Documento
                         { wch: 30 }, // Descripción
                         { wch: 15 }, // Estado
-                        { wch: 15 }, // Prioridad
+                        { wch: 15 }, // Tipo de Entrega
                         { wch: 20 }, // Transportador
-                        { wch: 20 }  // Fecha Asignación
+                        { wch: 20 }, // Fecha Asignación
+                        { wch: 20 }  // Fecha Creación
                     ];
                     
                     // Create workbook
@@ -1777,6 +1870,204 @@
                     XLSX.writeFile(wb, "documentos_transporte.xlsx");
                     
                     this.showNotification('Datos exportados exitosamente', 'success', 'fas fa-download');
+                },
+                
+                exportFilteredData() {
+                    try {
+                        // Filter deliveries based on export filters
+                        let filteredDeliveries = [...this.deliveries];
+                        
+                        // Filter by status
+                        if (this.exportFilters.status) {
+                            filteredDeliveries = filteredDeliveries.filter(d => d.status === this.exportFilters.status);
+                        }
+                        
+                        // Filter by delivery type
+                        if (this.exportFilters.deliveryType) {
+                            filteredDeliveries = filteredDeliveries.filter(d => d.deliveryType === this.exportFilters.deliveryType);
+                        }
+                        
+                        // Filter by date range
+                        if (this.exportFilters.dateFrom) {
+                            const fromDate = new Date(this.exportFilters.dateFrom);
+                            filteredDeliveries = filteredDeliveries.filter(d => new Date(d.createdAt) >= fromDate);
+                        }
+                        
+                        if (this.exportFilters.dateTo) {
+                            const toDate = new Date(this.exportFilters.dateTo);
+                            toDate.setHours(23, 59, 59, 999); // Include the entire day
+                            filteredDeliveries = filteredDeliveries.filter(d => new Date(d.createdAt) <= toDate);
+                        }
+                        
+                        if (filteredDeliveries.length === 0) {
+                            this.showNotification('No hay documentos que coincidan con los filtros seleccionados', 'warning', 'fas fa-exclamation-triangle');
+                            return;
+                        }
+                        
+                        // Prepare data for export
+                        const data = [
+                            ['Tipo de Documento', 'Número de Documento', 'Descripción', 'Estado', 'Tipo de Entrega', 'Transportador', 'Fecha Asignación', 'Fecha Creación']
+                        ];
+                        
+                        filteredDeliveries.forEach(delivery => {
+                            const assignment = this.assignments.find(a => a.deliveryId === delivery.id);
+                            const driver = assignment ? this.getDriverById(assignment.driverId) : null;
+                            
+                            data.push([
+                                delivery.documentType,
+                                delivery.documentNumber,
+                                delivery.description || '',
+                                this.getStatusText(delivery.status),
+                                delivery.deliveryType === 'nacional' ? 'Nacional' : 'Local',
+                                driver ? driver.name : 'No asignado',
+                                assignment ? new Date(assignment.assignmentTime).toLocaleString() : '',
+                                new Date(delivery.createdAt).toLocaleString()
+                            ]);
+                        });
+                        
+                        // Create worksheet
+                        const ws = XLSX.utils.aoa_to_sheet(data);
+                        
+                        // Set column widths
+                        ws['!cols'] = [
+                            { wch: 20 }, // Tipo de Documento
+                            { wch: 20 }, // Número de Documento
+                            { wch: 30 }, // Descripción
+                            { wch: 15 }, // Estado
+                            { wch: 15 }, // Tipo de Entrega
+                            { wch: 20 }, // Transportador
+                            { wch: 20 }, // Fecha Asignación
+                            { wch: 20 }  // Fecha Creación
+                        ];
+                        
+                        // Create workbook
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Documentos Filtrados");
+                        
+                        // Generate filename with filters applied
+                        let filename = "documentos_filtrados";
+                        if (this.exportFilters.status) {
+                            filename += `_${this.exportFilters.status}`;
+                        }
+                        if (this.exportFilters.deliveryType) {
+                            filename += `_${this.exportFilters.deliveryType}`;
+                        }
+                        if (this.exportFilters.dateFrom || this.exportFilters.dateTo) {
+                            filename += "_fechas";
+                        }
+                        filename += ".xlsx";
+                        
+                        // Export to file
+                        XLSX.writeFile(wb, filename);
+                        
+                        // Close modal and reset filters
+                        this.exportModalOpen = false;
+                        this.exportFilters = {
+                            status: '',
+                            dateFrom: '',
+                            dateTo: '',
+                            deliveryType: ''
+                        };
+                        
+                        this.showNotification(`${filteredDeliveries.length} documentos exportados exitosamente`, 'success', 'fas fa-download');
+                        
+                    } catch (error) {
+                        console.error('Export error:', error);
+                        this.showNotification('Error al exportar documentos', 'error', 'fas fa-exclamation-triangle');
+                    }
+                },
+                
+                // Complete Assignment Functions
+                showCompleteAssignmentModal(assignment) {
+                    try {
+                        const delivery = this.getDeliveryById(assignment.deliveryId);
+                        const driver = this.getDriverById(assignment.driverId);
+                        
+                        if (!delivery || !driver) {
+                            this.showNotification('Error: No se encontró la información de la asignación', 'error', 'fas fa-exclamation-triangle');
+                            return;
+                        }
+                        
+                        this.currentAssignmentToComplete = {
+                            assignmentId: assignment.id,
+                            deliveryId: assignment.deliveryId,
+                            driverId: assignment.driverId,
+                            documentNumber: delivery.documentNumber,
+                            documentType: delivery.documentType,
+                            driverName: driver.name,
+                            driverVehicle: driver.vehicle,
+                            assignmentTime: assignment.assignmentTime
+                        };
+                        
+                        // Set default completion date to current date/time
+                        const now = new Date();
+                        this.completionDate = now.toISOString().slice(0, 16);
+                        
+                        this.completeAssignmentModalOpen = true;
+                    } catch (error) {
+                        console.error('Error showing complete assignment modal:', error);
+                        this.showNotification('Error al abrir el modal de completar asignación', 'error', 'fas fa-exclamation-triangle');
+                    }
+                },
+                
+                confirmCompleteAssignment() {
+                    try {
+                        if (!this.completionDate) {
+                            this.showNotification('Debe seleccionar una fecha de completado', 'error', 'fas fa-exclamation-circle');
+                            return;
+                        }
+                        
+                        const completionDateTime = new Date(this.completionDate);
+                        const assignmentDateTime = new Date(this.currentAssignmentToComplete.assignmentTime);
+                        
+                        // Validate that completion date is not before assignment date
+                        if (completionDateTime < assignmentDateTime) {
+                            this.showNotification('La fecha de completado no puede ser anterior a la fecha de asignación', 'error', 'fas fa-exclamation-circle');
+                            return;
+                        }
+                        
+                        // Validate that completion date is not in the future
+                        const now = new Date();
+                        if (completionDateTime > now) {
+                            this.showNotification('La fecha de completado no puede ser futura', 'error', 'fas fa-exclamation-circle');
+                            return;
+                        }
+                        
+                        // Update delivery status to completed
+                        const deliveryIndex = this.deliveries.findIndex(d => d.id === this.currentAssignmentToComplete.deliveryId);
+                        if (deliveryIndex !== -1) {
+                            this.deliveries[deliveryIndex].status = 'completed';
+                            this.deliveries[deliveryIndex].completedAt = this.completionDate;
+                        }
+                        
+                        // Update assignment with completion info
+                        const assignmentIndex = this.assignments.findIndex(a => a.id === this.currentAssignmentToComplete.assignmentId);
+                        if (assignmentIndex !== -1) {
+                            this.assignments[assignmentIndex].completedAt = this.completionDate;
+                            this.assignments[assignmentIndex].status = 'completed';
+                        }
+                        
+                        // Free the driver
+                        const driverIndex = this.drivers.findIndex(d => d.id === this.currentAssignmentToComplete.driverId);
+                        if (driverIndex !== -1) {
+                            this.drivers[driverIndex].available = true;
+                        }
+                        
+                        // Save data
+                        this.saveData();
+                        this.filterDeliveries();
+                        
+                        // Close modal and reset
+                        this.completeAssignmentModalOpen = false;
+                        this.currentAssignmentToComplete = null;
+                        this.completionDate = '';
+                        
+                        this.showNotification('Asignación completada exitosamente', 'success', 'fas fa-check-circle');
+                        
+                    } catch (error) {
+                        console.error('Error completing assignment:', error);
+                        this.showNotification('Error al completar la asignación', 'error', 'fas fa-exclamation-triangle');
+                    }
                 }
             }
         }

@@ -367,6 +367,7 @@
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transportador</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Asignación</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                                 </tr>
@@ -390,6 +391,9 @@
                                                     <div x-text="getDriverById(assignment.driverId)?.vehicle" class="text-sm text-gray-500"></div>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900" x-text="getAssignmentDate(assignment.assignmentTime)"></div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <span x-text="getStatusText(getDeliveryById(assignment.deliveryId)?.status)" 
@@ -963,6 +967,26 @@
                     this.setupSessionTimeout();
                 },
                 
+                // Colombia timezone helper functions
+                getCurrentColombiaDateTime() {
+                    // Get current time in Colombia (UTC-5)
+                    const now = new Date();
+                    const colombiaTime = new Date(now.getTime() - (5 * 60 * 60 * 1000));
+                    return colombiaTime.toISOString();
+                },
+                
+                formatDateForColombia(dateString) {
+                    if (!dateString) return '';
+                    const date = new Date(dateString);
+                    // Format for Colombia timezone - only date, no time
+                    return date.toLocaleDateString('es-CO', {
+                        timeZone: 'America/Bogota',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                    });
+                },
+                
                 // Authentication & Security
                 login() {
                     try {
@@ -1473,8 +1497,9 @@
                         // Mark delivery as in progress
                         this.deliveries[deliveryIndex].status = 'in_progress';
                         
-                        // Create assignment
+                        // Create assignment with Colombia timezone
                         this.currentAssignment.id = Date.now().toString();
+                        this.currentAssignment.assignmentTime = this.getCurrentColombiaDateTime();
                         this.assignments.push({ ...this.currentAssignment });
                         
                         // Mark driver as unavailable
@@ -1618,6 +1643,16 @@
                         .map(word => word.charAt(0).toUpperCase())
                         .slice(0, 2)
                         .join('');
+                },
+                
+                getAssignmentDate(assignmentTime) {
+                    if (!assignmentTime) return '';
+                    const date = new Date(assignmentTime);
+                    return date.toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                    });
                 },
                 
                 // Excel Import Functions
@@ -1828,12 +1863,22 @@
                 exportToExcel() {
                     // Prepare data for export (all deliveries)
                     const data = [
-                        ['Tipo de Documento', 'Número de Documento', 'Descripción', 'Estado', 'Tipo de Entrega', 'Transportador', 'Fecha Asignación', 'Fecha Creación']
+                        ['Tipo de Documento', 'Número de Documento', 'Descripción', 'Estado', 'Tipo de Entrega', 'Transportador', 'Fecha Asignación', 'Fecha Creación', 'Fecha Completada']
                     ];
                     
                     this.deliveries.forEach(delivery => {
                         const assignment = this.assignments.find(a => a.deliveryId === delivery.id);
                         const driver = assignment ? this.getDriverById(assignment.driverId) : null;
+                        
+                        // Get completion date from delivery or assignment
+                        let completionDate = '';
+                        if (delivery.status === 'completed') {
+                            if (delivery.completedAt) {
+                                completionDate = this.formatDateForColombia(delivery.completedAt);
+                            } else if (assignment && assignment.completedAt) {
+                                completionDate = this.formatDateForColombia(assignment.completedAt);
+                            }
+                        }
                         
                         data.push([
                             delivery.documentType,
@@ -1842,8 +1887,9 @@
                             this.getStatusText(delivery.status),
                             delivery.deliveryType === 'nacional' ? 'Nacional' : 'Local',
                             driver ? driver.name : 'No asignado',
-                            assignment ? new Date(assignment.assignmentTime).toLocaleString() : '',
-                            new Date(delivery.createdAt).toLocaleString()
+                            assignment ? this.formatDateForColombia(assignment.assignmentTime) : '',
+                            this.formatDateForColombia(delivery.createdAt),
+                            completionDate
                         ]);
                     });
                     
@@ -1859,7 +1905,8 @@
                         { wch: 15 }, // Tipo de Entrega
                         { wch: 20 }, // Transportador
                         { wch: 20 }, // Fecha Asignación
-                        { wch: 20 }  // Fecha Creación
+                        { wch: 20 }, // Fecha Creación
+                        { wch: 20 }  // Fecha Completada
                     ];
                     
                     // Create workbook
@@ -1906,12 +1953,22 @@
                         
                         // Prepare data for export
                         const data = [
-                            ['Tipo de Documento', 'Número de Documento', 'Descripción', 'Estado', 'Tipo de Entrega', 'Transportador', 'Fecha Asignación', 'Fecha Creación']
+                            ['Tipo de Documento', 'Número de Documento', 'Descripción', 'Estado', 'Tipo de Entrega', 'Transportador', 'Fecha Asignación', 'Fecha Creación', 'Fecha Completada']
                         ];
                         
                         filteredDeliveries.forEach(delivery => {
                             const assignment = this.assignments.find(a => a.deliveryId === delivery.id);
                             const driver = assignment ? this.getDriverById(assignment.driverId) : null;
+                            
+                            // Get completion date from delivery or assignment
+                            let completionDate = '';
+                            if (delivery.status === 'completed') {
+                                if (delivery.completedAt) {
+                                    completionDate = this.formatDateForColombia(delivery.completedAt);
+                                } else if (assignment && assignment.completedAt) {
+                                    completionDate = this.formatDateForColombia(assignment.completedAt);
+                                }
+                            }
                             
                             data.push([
                                 delivery.documentType,
@@ -1920,8 +1977,9 @@
                                 this.getStatusText(delivery.status),
                                 delivery.deliveryType === 'nacional' ? 'Nacional' : 'Local',
                                 driver ? driver.name : 'No asignado',
-                                assignment ? new Date(assignment.assignmentTime).toLocaleString() : '',
-                                new Date(delivery.createdAt).toLocaleString()
+                                assignment ? this.formatDateForColombia(assignment.assignmentTime) : '',
+                                this.formatDateForColombia(delivery.createdAt),
+                                completionDate
                             ]);
                         });
                         
@@ -1937,7 +1995,8 @@
                             { wch: 15 }, // Tipo de Entrega
                             { wch: 20 }, // Transportador
                             { wch: 20 }, // Fecha Asignación
-                            { wch: 20 }  // Fecha Creación
+                            { wch: 20 }, // Fecha Creación
+                            { wch: 20 }  // Fecha Completada
                         ];
                         
                         // Create workbook
@@ -2017,33 +2076,37 @@
                             return;
                         }
                         
+                        // Convert completion date to Colombia timezone for consistency
                         const completionDateTime = new Date(this.completionDate);
                         const assignmentDateTime = new Date(this.currentAssignmentToComplete.assignmentTime);
                         
-                        // Validate that completion date is not before assignment date
+                        // Compare actual datetime values
                         if (completionDateTime < assignmentDateTime) {
                             this.showNotification('La fecha de completado no puede ser anterior a la fecha de asignación', 'error', 'fas fa-exclamation-circle');
                             return;
                         }
                         
-                        // Validate that completion date is not in the future
-                        const now = new Date();
-                        if (completionDateTime > now) {
+                        // Check if completion date is in the future (Colombia time)
+                        const nowColombia = new Date(new Date().getTime() - (5 * 60 * 60 * 1000));
+                        if (completionDateTime > nowColombia) {
                             this.showNotification('La fecha de completado no puede ser futura', 'error', 'fas fa-exclamation-circle');
                             return;
                         }
+                        
+                        // Create completion date in Colombia timezone format
+                        const colombiaCompletionDate = new Date(completionDateTime.getTime() - (5 * 60 * 60 * 1000)).toISOString();
                         
                         // Update delivery status to completed
                         const deliveryIndex = this.deliveries.findIndex(d => d.id === this.currentAssignmentToComplete.deliveryId);
                         if (deliveryIndex !== -1) {
                             this.deliveries[deliveryIndex].status = 'completed';
-                            this.deliveries[deliveryIndex].completedAt = this.completionDate;
+                            this.deliveries[deliveryIndex].completedAt = colombiaCompletionDate;
                         }
                         
                         // Update assignment with completion info
                         const assignmentIndex = this.assignments.findIndex(a => a.id === this.currentAssignmentToComplete.assignmentId);
                         if (assignmentIndex !== -1) {
-                            this.assignments[assignmentIndex].completedAt = this.completionDate;
+                            this.assignments[assignmentIndex].completedAt = colombiaCompletionDate;
                             this.assignments[assignmentIndex].status = 'completed';
                         }
                         
